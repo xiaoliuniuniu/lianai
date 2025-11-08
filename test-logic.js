@@ -1,14 +1,7 @@
-// Supabase配置
+// Supabase配置 - 使用你的实际信息
 const SUPABASE_URL = 'https://mlcvmeqferbrxgtcayvq.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1sY3ZtZXFmZXJicnhndGNheXZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI1ODM1MDMsImV4cCI6MjA3ODE1OTUwM30._zFyRhFhVLRhW0aP830pTYcNJyoJqlPWAEhONpLR5rk';
-
-// 创建 Supabase 客户端
-let supabaseClient = null;
-if (typeof supabase !== 'undefined') {
-    supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-} else {
-    console.warn('Supabase 库未加载，数据收集功能将不可用');
-}
+const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
 // 测试逻辑 - 恋爱脑测试
 class TestLogic {
@@ -25,6 +18,40 @@ class TestLogic {
         
         this.initializeCategories();
         this.bindEvents();
+        
+        // 新增：测试DeepSeek API连接（页面加载时自动测试）
+        this.testDeepSeekConnection();
+    }
+
+    // 新增：测试DeepSeek API连接的方法
+    async testDeepSeekConnection() {
+        console.log('🧪 开始测试DeepSeek API连接...');
+        
+        // 请将 '你的API密钥' 替换为你的真实DeepSeek API密钥
+        const api = new DeepSeekAPI('sk-c4b18ec8d5234f4aa8d78c9f8ade4727');
+        
+        try {
+            const result = await api.testConnection();
+            if (result) {
+                console.log('✅ DeepSeek API连接成功:', result);
+                // 在页面上显示连接状态（可选）
+                this.showAPIConnectionStatus('success', 'DeepSeek API连接成功！');
+            } else {
+                console.log('❌ DeepSeek API连接失败');
+                this.showAPIConnectionStatus('error', 'DeepSeek API连接失败，将使用本地模板');
+            }
+        } catch (error) {
+            console.log('❌ DeepSeek API测试出错:', error);
+            this.showAPIConnectionStatus('error', 'API测试出错: ' + error.message);
+        }
+    }
+
+    // 新增：显示API连接状态（可选功能）
+    showAPIConnectionStatus(type, message) {
+        // 只在开发时显示，正式版本可以移除
+        if (console && console.log) {
+            console.log(`API状态 [${type}]: ${message}`);
+        }
     }
 
     // 初始化分类分数
@@ -56,38 +83,42 @@ class TestLogic {
         return anonymousId;
     }
 
-    // 提交用户数据到Supabase
+    // 提交用户数据到Supabase - 修复版
     async submitUserData(resultData, personalizedResult) {
         // 检查Supabase是否可用
-        if (!supabaseClient) {
-            console.log('Supabase客户端未初始化，跳过数据提交');
+        if (!supabase) {
+            console.log('Supabase未配置，跳过数据提交');
             return;
         }
         
+        // 确保数据格式正确
         const submitData = {
             anonymous_id: this.anonymousUserId,
             browser_fingerprint: navigator.userAgent + '|' + navigator.language + '|' + screen.width + 'x' + screen.height,
             total_score: resultData.scores.normalizedTotalScore,
             level: personalizedResult.level,
-            answers: this.answers,
-            category_scores: resultData.categoryAverages,
-            time_patterns: this.times,
-            test_duration: this.times.reduce((a, b) => a + b, 0)
+            answers: JSON.stringify(this.answers), // 明确转换为JSON字符串
+            category_scores: JSON.stringify(resultData.categoryAverages), // 明确转换为JSON字符串
+            time_patterns: JSON.stringify(this.times), // 明确转换为JSON字符串
+            test_duration: Math.round(this.times.reduce((a, b) => a + b, 0)),
+            created_at: new Date().toISOString()
         };
         
         try {
             console.log('准备提交数据到Supabase:', submitData);
             
-            const { data, error } = await supabaseClient
+            const { data, error } = await supabase
                 .from('test_results')
-                .insert([submitData]);
+                .insert([submitData])
+                .select(); // 添加select()来获取返回数据
             
             if (error) {
                 console.error('❌ 数据提交失败:', error);
                 console.error('错误详情:', error.message);
             } else {
-                console.log('✅ 数据提交成功');
+                console.log('✅ 数据提交成功!');
                 console.log('返回数据:', data);
+                console.log('数据已存储到Supabase，ID:', data[0]?.id);
             }
         } catch (error) {
             console.log('❌ 数据提交异常:', error);
