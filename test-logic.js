@@ -1,7 +1,14 @@
-// Supabase配置 - 使用你的实际信息
+// Supabase配置
 const SUPABASE_URL = 'https://mlcvmeqferbrxgtcayvq.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1sY3ZtZXFmZXJicnhndGNheXZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI1ODM1MDMsImV4cCI6MjA3ODE1OTUwM30._zFyRhFhVLRhW0aP830pTYcNJyoJqlPWAEhONpLR5rk';
-const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+// 创建 Supabase 客户端
+let supabaseClient = null;
+if (typeof supabase !== 'undefined') {
+    supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+} else {
+    console.warn('Supabase 库未加载，数据收集功能将不可用');
+}
 
 // 测试逻辑 - 恋爱脑测试
 class TestLogic {
@@ -52,8 +59,8 @@ class TestLogic {
     // 提交用户数据到Supabase
     async submitUserData(resultData, personalizedResult) {
         // 检查Supabase是否可用
-        if (!supabase) {
-            console.log('Supabase未配置，跳过数据提交');
+        if (!supabaseClient) {
+            console.log('Supabase客户端未初始化，跳过数据提交');
             return;
         }
         
@@ -65,24 +72,25 @@ class TestLogic {
             answers: this.answers,
             category_scores: resultData.categoryAverages,
             time_patterns: this.times,
-            test_duration: this.times.reduce((a, b) => a + b, 0),
-            created_at: new Date().toISOString()
+            test_duration: this.times.reduce((a, b) => a + b, 0)
         };
         
         try {
             console.log('准备提交数据到Supabase:', submitData);
             
-            const { data, error } = await supabase
+            const { data, error } = await supabaseClient
                 .from('test_results')
                 .insert([submitData]);
             
             if (error) {
-                console.error('数据提交失败:', error);
+                console.error('❌ 数据提交失败:', error);
+                console.error('错误详情:', error.message);
             } else {
-                console.log('数据提交成功:', data);
+                console.log('✅ 数据提交成功');
+                console.log('返回数据:', data);
             }
         } catch (error) {
-            console.log('数据提交异常（不影响用户体验）:', error);
+            console.log('❌ 数据提交异常:', error);
         }
     }
 
